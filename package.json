@@ -3,12 +3,18 @@
   "version": "1.0.0",
   "description": "Backend API for UOW Room Booking System",
   "main": "server.js",
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
     "migrate": "knex migrate:latest",
     "rollback": "knex migrate:rollback",
-    "seed": "knex seed:run"
+    "seed": "knex seed:run",
+    "build": "npm run migrate && npm run seed",
+    "postinstall": "npm run migrate"
   },
   "keywords": ["room-booking", "express", "mysql", "bookshelf", "api"],
   "author": "UOW Room Booking Team",
