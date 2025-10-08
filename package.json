@@ -16,22 +16,29 @@
     "build": "npm run migrate && npm run seed",
     "postinstall": "npm run migrate"
   },
-  "keywords": ["room-booking", "express", "mysql", "bookshelf", "api"],
+  "keywords": [
+    "room-booking",
+    "express",
+    "mysql",
+    "bookshelf",
+    "api"
+  ],
   "author": "UOW Room Booking Team",
   "license": "MIT",
   "dependencies": {
-    "express": "^4.18.2",
+    "@tanstack/react-query": "^5.90.2",
+    "bcryptjs": "^2.4.3",
     "bookshelf": "^1.2.0",
-    "knex": "^0.21.21",
-    "mysql2": "^2.3.3",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
-    "bcryptjs": "^2.4.3",
-    "jsonwebtoken": "^9.0.2",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
     "express-validator": "^7.0.1",
     "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "knex": "^0.21.21",
     "morgan": "^1.10.0",
-    "express-rate-limit": "^7.1.5"
+    "mysql2": "^2.3.3"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
