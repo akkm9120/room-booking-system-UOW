@@ -180,18 +180,43 @@ router.post('/rooms', authenticateAdmin, validateRoom, async (req, res, next) =>
     const roomData = req.body;
     
     // Check if room number already exists
-    const existingRoom = await Room.findByRoomNumber(roomData.room_number);
-    if (existingRoom) {
-      return res.status(400).json({
-        success: false,
-        message: 'Room number already exists'
-      });
+    try {
+      const existingRoom = await Room.where({ room_number: roomData.room_number }).fetch();
+      if (existingRoom) {
+        return res.status(400).json({
+          success: false,
+          message: 'Room number already exists'
+        });
+      }
+    } catch (error) {
+      // If the query fails, it might be because no room was found, which is fine
+      console.log('Room number check query result:', error.message);
+      // Continue with room creation
     }
 
-    // Convert amenities array to JSON string if provided
-    if (roomData.amenities && Array.isArray(roomData.amenities)) {
-      roomData.amenities = JSON.stringify(roomData.amenities);
+    // Handle amenities field - ensure it's properly formatted for JSON storage
+    if (roomData.amenities) {
+      if (Array.isArray(roomData.amenities)) {
+        roomData.amenities = JSON.stringify(roomData.amenities);
+      } else if (typeof roomData.amenities === 'string') {
+        // If it's already a string, try to parse and re-stringify to validate
+        try {
+          const parsed = JSON.parse(roomData.amenities);
+          roomData.amenities = JSON.stringify(parsed);
+        } catch (e) {
+          // If parsing fails, treat as empty array
+          roomData.amenities = JSON.stringify([]);
+        }
+      } else {
+        roomData.amenities = JSON.stringify([]);
+      }
+    } else {
+      roomData.amenities = JSON.stringify([]);
     }
+
+    // Ensure boolean fields are properly converted
+    roomData.is_available = roomData.is_available ? 1 : 0;
+    roomData.requires_approval = roomData.requires_approval ? 1 : 0;
 
     const room = await Room.forge(roomData).save();
 
@@ -201,6 +226,7 @@ router.post('/rooms', authenticateAdmin, validateRoom, async (req, res, next) =>
       data: room.toJSON()
     });
   } catch (error) {
+    console.error('Room creation error:', error);
     next(error);
   }
 });

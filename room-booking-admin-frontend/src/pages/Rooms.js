@@ -79,11 +79,17 @@ const Rooms = () => {
   const handleEditRoom = (room) => {
     setEditingRoom(room);
     reset({
-      name: room.name,
-      capacity: room.capacity,
+      room_number: room.room_number,
+      room_name: room.room_name,
       location: room.location,
+      building: room.building,
+      floor: room.floor,
+      capacity: room.capacity,
+      room_type: room.room_type,
       description: room.description,
-      equipment: room.equipment,
+      hourly_rate: room.hourly_rate,
+      is_available: room.is_available,
+      requires_approval: room.requires_approval
     });
     setShowModal(true);
   };
@@ -103,8 +109,9 @@ const Rooms = () => {
   };
 
   const filteredRooms = rooms?.data?.filter(room =>
-    room.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    room.location?.toLowerCase().includes(searchTerm.toLowerCase())
+    room.room_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    room.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    room.room_number?.toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
 
   if (isLoading) {
@@ -158,7 +165,8 @@ const Rooms = () => {
             <div key={room.id} className="card">
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">{room.name}</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">{room.room_name}</h3>
+                  <div className="text-sm text-gray-600 font-medium">{room.room_number}</div>
                   <div className="flex items-center text-sm text-gray-500 mt-1">
                     <MapPin className="h-4 w-4 mr-1" />
                     {room.location}
@@ -188,26 +196,45 @@ const Rooms = () => {
                   Capacity: {room.capacity} people
                 </div>
 
+                <div className="text-sm text-gray-600">
+                  <strong>Type:</strong> {room.room_type?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                </div>
+
+                <div className="text-sm text-gray-600">
+                  <strong>Building:</strong> {room.building}, Floor {room.floor}
+                </div>
+
+                <div className="text-sm text-gray-600">
+                  <strong>Rate:</strong> ${room.hourly_rate}/hour
+                </div>
+
                 {room.description && (
                   <p className="text-sm text-gray-600 line-clamp-2">
                     {room.description}
                   </p>
                 )}
 
-                {room.equipment && (
+                {room.amenities && room.amenities.length > 0 && (
                   <div className="text-sm text-gray-600">
-                    <strong>Equipment:</strong> {room.equipment}
+                    <strong>Amenities:</strong> {room.amenities.join(', ')}
                   </div>
                 )}
 
                 <div className="flex items-center justify-between pt-4 border-t">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    room.isAvailable 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    {room.isAvailable ? 'Available' : 'Unavailable'}
-                  </span>
+                  <div className="flex flex-col space-y-1">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      room.is_available 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {room.is_available ? 'Available' : 'Unavailable'}
+                    </span>
+                    {room.requires_approval && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                        Requires Approval
+                      </span>
+                    )}
+                  </div>
 
                   <div className="flex space-x-2">
                     <button
@@ -259,33 +286,57 @@ const Rooms = () => {
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div>
-                <label className="form-label">Room Name</label>
+                <label className="form-label">Room Number</label>
                 <input
                   type="text"
-                  className={`form-input ${errors.name ? 'border-red-500' : ''}`}
-                  placeholder="e.g., Conference Room A"
-                  {...register('name', { required: 'Room name is required' })}
+                  className={`form-input ${errors.room_number ? 'border-red-500' : ''}`}
+                  placeholder="e.g., CR201"
+                  {...register('room_number', { required: 'Room number is required' })}
                 />
-                {errors.name && (
-                  <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
+                {errors.room_number && (
+                  <p className="mt-1 text-sm text-red-600">{errors.room_number.message}</p>
                 )}
               </div>
 
               <div>
-                <label className="form-label">Capacity</label>
+                <label className="form-label">Room Name</label>
                 <input
-                  type="number"
-                  min="1"
-                  className={`form-input ${errors.capacity ? 'border-red-500' : ''}`}
-                  placeholder="e.g., 10"
-                  {...register('capacity', { 
-                    required: 'Capacity is required',
-                    min: { value: 1, message: 'Capacity must be at least 1' }
-                  })}
+                  type="text"
+                  className={`form-input ${errors.room_name ? 'border-red-500' : ''}`}
+                  placeholder="e.g., Conference Room 201"
+                  {...register('room_name', { required: 'Room name is required' })}
                 />
-                {errors.capacity && (
-                  <p className="mt-1 text-sm text-red-600">{errors.capacity.message}</p>
+                {errors.room_name && (
+                  <p className="mt-1 text-sm text-red-600">{errors.room_name.message}</p>
                 )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="form-label">Building</label>
+                  <input
+                    type="text"
+                    className={`form-input ${errors.building ? 'border-red-500' : ''}`}
+                    placeholder="e.g., Building 2"
+                    {...register('building', { required: 'Building is required' })}
+                  />
+                  {errors.building && (
+                    <p className="mt-1 text-sm text-red-600">{errors.building.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="form-label">Floor</label>
+                  <input
+                    type="text"
+                    className={`form-input ${errors.floor ? 'border-red-500' : ''}`}
+                    placeholder="e.g., 2"
+                    {...register('floor', { required: 'Floor is required' })}
+                  />
+                  {errors.floor && (
+                    <p className="mt-1 text-sm text-red-600">{errors.floor.message}</p>
+                  )}
+                </div>
               </div>
 
               <div>
@@ -293,11 +344,67 @@ const Rooms = () => {
                 <input
                   type="text"
                   className={`form-input ${errors.location ? 'border-red-500' : ''}`}
-                  placeholder="e.g., Building A, Floor 2"
+                  placeholder="e.g., Building 2, Second Floor"
                   {...register('location', { required: 'Location is required' })}
                 />
                 {errors.location && (
                   <p className="mt-1 text-sm text-red-600">{errors.location.message}</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="form-label">Capacity</label>
+                  <input
+                    type="number"
+                    min="1"
+                    className={`form-input ${errors.capacity ? 'border-red-500' : ''}`}
+                    placeholder="e.g., 20"
+                    {...register('capacity', { 
+                      required: 'Capacity is required',
+                      min: { value: 1, message: 'Capacity must be at least 1' }
+                    })}
+                  />
+                  {errors.capacity && (
+                    <p className="mt-1 text-sm text-red-600">{errors.capacity.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="form-label">Hourly Rate ($)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    className={`form-input ${errors.hourly_rate ? 'border-red-500' : ''}`}
+                    placeholder="e.g., 25.00"
+                    {...register('hourly_rate', { 
+                      required: 'Hourly rate is required',
+                      min: { value: 0, message: 'Rate must be 0 or greater' }
+                    })}
+                  />
+                  {errors.hourly_rate && (
+                    <p className="mt-1 text-sm text-red-600">{errors.hourly_rate.message}</p>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="form-label">Room Type</label>
+                <select
+                  className={`form-input ${errors.room_type ? 'border-red-500' : ''}`}
+                  {...register('room_type', { required: 'Room type is required' })}
+                >
+                  <option value="">Select room type</option>
+                  <option value="auditorium">Auditorium</option>
+                  <option value="conference_room">Conference Room</option>
+                  <option value="meeting_room">Meeting Room</option>
+                  <option value="lab">Lab</option>
+                  <option value="classroom">Classroom</option>
+                  <option value="office">Office</option>
+                </select>
+                {errors.room_type && (
+                  <p className="mt-1 text-sm text-red-600">{errors.room_type.message}</p>
                 )}
               </div>
 
@@ -310,14 +417,30 @@ const Rooms = () => {
                 />
               </div>
 
-              <div>
-                <label className="form-label">Equipment</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="e.g., Projector, Whiteboard, WiFi"
-                  {...register('equipment')}
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="is_available"
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    {...register('is_available')}
+                  />
+                  <label htmlFor="is_available" className="ml-2 block text-sm text-gray-900">
+                    Available for booking
+                  </label>
+                </div>
+
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="requires_approval"
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    {...register('requires_approval')}
+                  />
+                  <label htmlFor="requires_approval" className="ml-2 block text-sm text-gray-900">
+                    Requires approval
+                  </label>
+                </div>
               </div>
 
               <div className="flex justify-end space-x-3 pt-6">
