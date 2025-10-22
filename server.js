@@ -29,13 +29,14 @@ app.use(helmet({
   },
 }));
 
-// CORS configuration (allow all origins)
+// CORS configuration (allow all origins and preflight)
 app.use(cors({
   origin: true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+// Handle preflight requests globally
+app.options('*', cors());
 
 // Rate limiting disabled
 // Global and auth-specific rate limiters have been removed to allow unrestricted access.
