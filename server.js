@@ -29,64 +29,16 @@ app.use(helmet({
   },
 }));
 
-// CORS configuration
-const allowedOrigins = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
-  : ['http://localhost:3000', 'http://localhost:3001'];
-
+// CORS configuration (allow all origins)
 app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    // If ALLOWED_ORIGINS is set to '*', allow all origins
-    if (allowedOrigins.includes('*')) {
-      return callback(null, true);
-    }
-    
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: {
-    success: false,
-    message: 'Too many requests from this IP, please try again later.'
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-// Apply rate limiting to all requests
-app.use(limiter);
-
-// Stricter rate limiting for auth endpoints
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // limit each IP to 5 requests per windowMs for auth endpoints
-  message: {
-    success: false,
-    message: 'Too many authentication attempts, please try again later.'
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-// Apply stricter rate limiting to auth routes
-app.use('/api/admin/login', authLimiter);
-app.use('/api/admin/register', authLimiter);
-app.use('/api/visitor/login', authLimiter);
-app.use('/api/visitor/register', authLimiter);
+// Rate limiting disabled
+// Global and auth-specific rate limiters have been removed to allow unrestricted access.
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
