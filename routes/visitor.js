@@ -344,8 +344,8 @@ router.post('/bookings', authenticateVisitor, validateBooking, async (req, res, 
     const bookingReference = await Booking.generateBookingReference();
 
     // Calculate total cost
-    const startDateTime = new Date(`${booking_date}T${start_time}`);
-    const endDateTime = new Date(`${booking_date}T${end_time}`);
+    const startDateTime = new Date(start_time);
+    const endDateTime = new Date(end_time);
     const durationHours = (endDateTime - startDateTime) / (1000 * 60 * 60);
     const totalCost = durationHours * room.get('hourly_rate');
 
@@ -359,7 +359,7 @@ router.post('/bookings', authenticateVisitor, validateBooking, async (req, res, 
       end_time,
       purpose,
       description,
-      attendees: attendees || 1,
+      expected_attendees: attendees || 1,
       status: room.get('requires_approval') ? 'pending' : 'confirmed',
       total_cost: totalCost
     }).save();
@@ -567,8 +567,8 @@ router.put('/bookings/:id', authenticateVisitor, validateId, validateBooking, as
       }
 
       // Recalculate total cost if room or time changed
-      const startDateTime = new Date(`${booking_date}T${start_time}`);
-      const endDateTime = new Date(`${booking_date}T${end_time}`);
+      const startDateTime = new Date(start_time);
+      const endDateTime = new Date(end_time);
       const durationHours = (endDateTime - startDateTime) / (1000 * 60 * 60);
       const totalCost = durationHours * room.get('hourly_rate');
 
@@ -579,7 +579,7 @@ router.put('/bookings/:id', authenticateVisitor, validateId, validateBooking, as
         end_time,
         purpose,
         description,
-        attendees: attendees || booking.get('attendees'),
+        expected_attendees: attendees || booking.get('expected_attendees'),
         total_cost: totalCost
       });
     } else {
@@ -587,7 +587,7 @@ router.put('/bookings/:id', authenticateVisitor, validateId, validateBooking, as
       await booking.save({
         purpose,
         description,
-        attendees: attendees || booking.get('attendees')
+        expected_attendees: attendees || booking.get('expected_attendees')
       });
     }
 

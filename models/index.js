@@ -113,6 +113,39 @@ const Booking = bookshelf.model('Booking', {
   approvedBy() {
     return this.belongsTo('Admin', 'approved_by');
   }
+}, {
+  async checkConflictingBookings(room_id, booking_date, start_time, end_time) {
+    return await Booking
+      .where('room_id', room_id)
+      .where('booking_date', booking_date)
+      .where('status', 'confirmed')
+      .where(function() {
+        this.where(function() {
+          this.where('start_time', '<=', start_time)
+            .where('end_time', '>', start_time);
+        }).orWhere(function() {
+          this.where('start_time', '<', end_time)
+            .where('end_time', '>=', end_time);
+        }).orWhere(function() {
+          this.where('start_time', '>=', start_time)
+            .where('end_time', '<=', end_time);
+        });
+      })
+      .fetchAll();
+  },
+  async generateBookingReference() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    async function exists(ref) {
+      const row = await knex('bookings').where({ booking_reference: ref }).first();
+      return !!row;
+    }
+    let ref;
+    do {
+      const rand = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+      ref = `RB-${new Date().getFullYear()}-${rand}`;
+    } while (await exists(ref));
+    return ref;
+  }
 });
 addCount(Booking);
 
