@@ -72,6 +72,10 @@ const Visitor = bookshelf.model('Visitor', {
   hasTimestamps: true,
   bookings() {
     return this.hasMany('Booking', 'visitor_id');
+  },
+  async validatePassword(password) {
+    const hashed = this.get('password');
+    return bcrypt.compare(password, hashed);
   }
 }, {
   async findByEmail(email) {
