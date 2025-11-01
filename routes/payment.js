@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const stripe = require('stripe')(require('../config/stripe').secretKey);
 const stripeConfig = require('../config/stripe');
-const { auth } = require('../middleware/auth');
+const auth = require('../middleware/auth');
 const { models } = require('../models');
 
 /**
