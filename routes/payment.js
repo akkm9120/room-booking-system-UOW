@@ -125,7 +125,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
  * Verify payment status for a booking
  * @route GET /api/payment/verify/:bookingId
  */
-router.get('/verify/:bookingId', auth('visitor'), async (req, res) => {
+router.get('/verify/:bookingId', auth.authenticateVisitor, async (req, res) => {
   try {
     const { bookingId } = req.params;
     
