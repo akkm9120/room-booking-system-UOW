@@ -11,7 +11,7 @@ const { models } = require('../models');
  * @param {string} booking_id - The ID of the booking to pay for
  * @returns {Object} Stripe checkout session
  */
-router.post('/create-checkout-session', auth('visitor'), async (req, res) => {
+router.post('/create-checkout-session', auth.authenticateVisitor, async (req, res) => {
   try {
     const { booking_id } = req.body;
     
