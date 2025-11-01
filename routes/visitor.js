@@ -349,7 +349,7 @@ router.post('/bookings', authenticateVisitor, validateBooking, async (req, res, 
     const durationHours = (endDateTime - startDateTime) / (1000 * 60 * 60);
     const totalCost = durationHours * room.get('hourly_rate');
 
-    // Create booking
+    // Create booking with pending payment status
     const booking = await Booking.forge({
       room_id,
       visitor_id: req.user.id,
@@ -360,7 +360,7 @@ router.post('/bookings', authenticateVisitor, validateBooking, async (req, res, 
       purpose,
       description,
       expected_attendees: attendees || 1,
-      status: room.get('requires_approval') ? 'pending' : 'confirmed',
+      status: 'pending', // Always pending until payment is completed
       total_cost: totalCost
     }).save();
 
@@ -368,11 +368,45 @@ router.post('/bookings', authenticateVisitor, validateBooking, async (req, res, 
     const newBooking = await Booking.where({ id: booking.id }).fetch({
       withRelated: ['room', 'visitor']
     });
+    
+    // Create Stripe checkout session
+    const stripe = require('stripe')(require('../config/stripe').secretKey);
+    const stripeConfig = require('../config/stripe');
+    
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: stripeConfig.currency,
+            product_data: {
+              name: `Room Booking: ${room.get('room_name')}`,
+              description: `Booking Reference: ${bookingReference}`,
+            },
+            unit_amount: Math.round(totalCost * 100), // Convert to cents
+          },
+          quantity: 1,
+        },
+      ],
+      metadata: {
+        booking_id: booking.id,
+        booking_reference: bookingReference,
+      },
+      mode: 'payment',
+      success_url: stripeConfig.successUrl,
+      cancel_url: stripeConfig.cancelUrl,
+    });
 
     res.status(201).json({
       success: true,
-      message: 'Booking created successfully',
-      data: newBooking.toJSON()
+      message: 'Booking created successfully, redirecting to payment',
+      data: {
+        booking: newBooking.toJSON(),
+        payment: {
+          sessionId: session.id,
+          url: session.url
+        }
+      }
     });
   } catch (error) {
     next(error);

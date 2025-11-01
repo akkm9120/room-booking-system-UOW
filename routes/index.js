@@ -4,6 +4,7 @@ const router = express.Router();
 // Import route modules
 const adminRoutes = require('./admin');
 const visitorRoutes = require('./visitor');
+const paymentRoutes = require('./payment');
 
 
 
@@ -70,8 +71,26 @@ router.get('/', (req, res) => {
   });
 });
 
+// Stripe redirect routes
+router.get('/booking/success', (req, res) => {
+  const sessionId = req.query.session_id;
+  res.json({
+    success: true,
+    message: 'Payment successful',
+    sessionId: sessionId
+  });
+});
+
+router.get('/booking/cancel', (req, res) => {
+  res.json({
+    success: false,
+    message: 'Payment cancelled',
+  });
+});
+
 // Mount route modules
 router.use('/admin', adminRoutes);
 router.use('/visitor', visitorRoutes);
+router.use('/payment', paymentRoutes);
 
 module.exports = router;
