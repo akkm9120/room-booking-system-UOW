@@ -360,7 +360,7 @@ router.post('/bookings', authenticateVisitor, validateBooking, async (req, res, 
       purpose,
       description,
       expected_attendees: attendees || 1,
-      status: 'pending', // Always pending until payment is completed
+      status: 'pending_payment', // Payment required first
       total_cost: totalCost
     }).save();
 
@@ -491,10 +491,10 @@ router.patch('/bookings/:id/cancel', authenticateVisitor, validateId, async (req
       });
     }
 
-    if (!['pending', 'confirmed'].includes(booking.get('status'))) {
+    if (!['paid', 'pending_approval'].includes(booking.get('status'))) {
       return res.status(400).json({
         success: false,
-        message: 'Only pending or confirmed bookings can be cancelled'
+        message: 'Only paid bookings awaiting approval can be cancelled'
       });
     }
 
@@ -541,10 +541,10 @@ router.put('/bookings/:id', authenticateVisitor, validateId, validateBooking, as
       });
     }
 
-    if (booking.get('status') !== 'pending') {
+    if (booking.get('status') !== 'approved') {
       return res.status(400).json({
         success: false,
-        message: 'Only pending bookings can be updated'
+        message: 'Only approved bookings can be updated'
       });
     }
 
@@ -658,6 +658,74 @@ router.get('/bookings/history', authenticateVisitor, async (req, res, next) => {
       data: bookings.toJSON(),
       pagination: bookings.pagination
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+
+
+// Stripe webhook to handle payment confirmation
+router.post('/stripe/webhook', async (req, res, next) => {
+  try {
+    const stripe = require('stripe')(require('../config/stripe').secretKey);
+    const endpointSecret = require('../config/stripe').webhookSecret;
+    
+    const sig = req.headers['stripe-signature'];
+    let event;
+
+    try {
+      event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+    } catch (err) {
+      console.log(`Webhook signature verification failed.`, err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    // Handle the event
+    switch (event.type) {
+      case 'checkout.session.completed':
+        const session = event.data.object;
+        
+        // Update booking status to paid and pending approval
+        if (session.metadata && session.metadata.booking_id) {
+          const booking = await Booking.where({ id: session.metadata.booking_id }).fetch();
+          
+          if (booking && booking.get('status') === 'pending_payment') {
+            await booking.save({
+              status: 'pending_approval',
+              payment_status: 'paid',
+              stripe_session_id: session.id,
+              payment_date: new Date()
+            });
+            
+            console.log(`Booking ${booking.get('booking_reference')} payment confirmed`);
+          }
+        }
+        break;
+        
+      case 'checkout.session.expired':
+        const expiredSession = event.data.object;
+        
+        // Cancel booking if payment session expired
+        if (expiredSession.metadata && expiredSession.metadata.booking_id) {
+          const booking = await Booking.where({ id: expiredSession.metadata.booking_id }).fetch();
+          
+          if (booking && booking.get('status') === 'pending_payment') {
+            await booking.save({
+              status: 'cancelled',
+              cancellation_reason: 'Payment session expired'
+            });
+            
+            console.log(`Booking ${booking.get('booking_reference')} cancelled due to payment expiry`);
+          }
+        }
+        break;
+        
+      default:
+        console.log(`Unhandled event type ${event.type}`);
+    }
+
+    res.json({ received: true });
   } catch (error) {
     next(error);
   }

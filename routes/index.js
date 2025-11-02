@@ -13,7 +13,7 @@ router.get('/', (req, res) => {
   res.json({
     success: true,
     message: 'Welcome to Room Booking System API',
-    version: '1.0.0',
+    version: '2.0.0',
     endpoints: {
       admin: {
         base: '/api/admin',
@@ -29,8 +29,8 @@ router.get('/', (req, res) => {
           'DELETE /api/admin/rooms/:id - Delete room',
           'GET /api/admin/bookings - Get all bookings',
           'GET /api/admin/bookings/:id - Get single booking',
-          'PATCH /api/admin/bookings/:id/approve - Approve booking',
-          'PATCH /api/admin/bookings/:id/reject - Reject booking',
+          'PATCH /api/admin/bookings/:id/approve - Approve paid booking (pending_approval → approved)',
+          'PATCH /api/admin/bookings/:id/reject - Reject paid booking (pending_approval → rejected)',
           'GET /api/admin/visitors - Get all visitors',
           'GET /api/admin/visitors/:id - Get single visitor',
           'PATCH /api/admin/visitors/:id/activate - Activate visitor',
@@ -49,14 +49,47 @@ router.get('/', (req, res) => {
           'GET /api/visitor/rooms - Get available rooms',
           'GET /api/visitor/rooms/:id - Get single room',
           'GET /api/visitor/rooms/:id/availability - Check room availability',
-          'POST /api/visitor/bookings - Create new booking',
+          'POST /api/visitor/bookings - Create new booking with Stripe payment (returns checkout URL)',
           'GET /api/visitor/bookings - Get visitor bookings',
           'GET /api/visitor/bookings/:id - Get single booking',
-          'PUT /api/visitor/bookings/:id - Update booking',
-          'PATCH /api/visitor/bookings/:id/cancel - Cancel booking',
-          'GET /api/visitor/bookings/history - Get booking history'
+          'PUT /api/visitor/bookings/:id - Update booking (approved bookings only)',
+          'PATCH /api/visitor/bookings/:id/cancel - Cancel booking (paid/pending_approval only)',
+          'GET /api/visitor/bookings/history - Get booking history',
+          'POST /api/visitor/stripe/webhook - Stripe webhook for payment confirmations'
+        ]
+      },
+      payment: {
+        base: '/api/payment',
+        description: 'Payment processing endpoints',
+        routes: [
+          'POST /api/payment/create-checkout-session - Create Stripe checkout session',
+          'POST /api/payment/webhook - Stripe webhook handler'
         ]
       }
+    },
+    booking_workflow: {
+      description: 'Payment-first booking workflow with admin approval',
+      status_flow: 'pending_payment → pending_approval → approved/rejected',
+      statuses: {
+        pending_payment: 'Booking created, awaiting payment',
+        pending_approval: 'Payment completed, awaiting admin decision',
+        approved: 'Admin approved the booking',
+        rejected: 'Admin rejected the booking',
+        cancelled: 'User cancelled or payment expired'
+      },
+      restrictions: {
+        cancellation: 'Only allowed for paid/pending_approval bookings',
+        updates: 'Only allowed for approved bookings',
+        admin_actions: 'Can only approve/reject pending_approval bookings'
+      }
+    },
+    stripe_integration: {
+      description: 'Stripe payment processing with webhooks',
+      checkout_flow: 'POST /bookings returns Stripe checkout URL → User pays → Webhook confirms payment',
+      webhook_events: [
+        'checkout.session.completed - Updates status to pending_approval',
+        'checkout.session.expired - Cancels unpaid booking'
+      ]
     },
     documentation: {
       authentication: 'JWT Bearer token required for protected routes',
@@ -65,7 +98,8 @@ router.get('/', (req, res) => {
         success: 'boolean',
         message: 'string',
         data: 'object|array (optional)',
-        pagination: 'object (for paginated responses)'
+        pagination: 'object (for paginated responses)',
+        checkout_url: 'string (for booking creation with Stripe)'
       }
     }
   });

@@ -372,16 +372,16 @@ router.patch('/bookings/:id/approve', authenticateAdmin, validateId, async (req,
       });
     }
 
-    if (booking.get('status') !== 'pending') {
+    if (booking.get('status') !== 'pending_approval') {
       return res.status(400).json({
         success: false,
-        message: 'Only pending bookings can be approved'
+        message: 'Only paid bookings awaiting approval can be approved'
       });
     }
 
     await booking.save({
-      status: 'confirmed',
-      approved_by: req.user.id,
+      status: 'approved',
+      approved_by: req.admin.id,
       approved_at: new Date()
     });
 
@@ -412,17 +412,17 @@ router.patch('/bookings/:id/reject', authenticateAdmin, validateId, async (req, 
       });
     }
 
-    if (booking.get('status') !== 'pending') {
+    if (booking.get('status') !== 'pending_approval') {
       return res.status(400).json({
         success: false,
-        message: 'Only pending bookings can be rejected'
+        message: 'Only paid bookings awaiting approval can be rejected'
       });
     }
 
     await booking.save({
-      status: 'cancelled',
-      cancellation_reason: reason,
-      approved_by: req.user.id,
+      status: 'rejected',
+      cancellation_reason: reason || 'Rejected by admin',
+      approved_by: req.admin.id,
       approved_at: new Date()
     });
 
@@ -557,8 +557,11 @@ router.get('/dashboard/stats', authenticateAdmin, async (req, res, next) => {
     const totalRooms = await Room.count();
     const totalVisitors = await Visitor.count();
     const totalBookings = await Booking.count();
-    const pendingBookings = await Booking.where('status', 'pending').count();
-    const confirmedBookings = await Booking.where('status', 'confirmed').count();
+    const pendingPaymentBookings = await Booking.where('status', 'pending_payment').count();
+    const pendingApprovalBookings = await Booking.where('status', 'pending_approval').count();
+    const approvedBookings = await Booking.where('status', 'approved').count();
+    const rejectedBookings = await Booking.where('status', 'rejected').count();
+    const cancelledBookings = await Booking.where('status', 'cancelled').count();
     const todayBookings = await Booking.where('booking_date', new Date().toISOString().split('T')[0]).count();
 
     res.json({
@@ -567,8 +570,11 @@ router.get('/dashboard/stats', authenticateAdmin, async (req, res, next) => {
         totalRooms,
         totalVisitors,
         totalBookings,
-        pendingBookings,
-        confirmedBookings,
+        pendingPaymentBookings,
+        pendingApprovalBookings,
+        approvedBookings,
+        rejectedBookings,
+        cancelledBookings,
         todayBookings
       }
     });

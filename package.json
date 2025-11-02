@@ -27,6 +27,7 @@
   "license": "MIT",
   "dependencies": {
     "@tanstack/react-query": "^5.90.2",
+    "axios": "^1.13.1",
     "bcryptjs": "^2.4.3",
     "bookshelf": "^1.2.0",
     "cors": "^2.8.5",
