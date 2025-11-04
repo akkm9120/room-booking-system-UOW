@@ -315,7 +315,7 @@ router.post('/bookings', authenticateVisitor, validateBooking, async (req, res, 
       end_time,
       purpose,
       description,
-      attendees
+      expected_attendees
     } = req.body;
 
     // Check if room exists and is available
@@ -342,7 +342,7 @@ router.post('/bookings', authenticateVisitor, validateBooking, async (req, res, 
       });
     }
 
-    // Generate booking reference (used in Stripe metadata)
+    // Generate booking reference
     const bookingReference = await Booking.generateBookingReference();
 
     // Calculate total cost
@@ -351,61 +351,37 @@ router.post('/bookings', authenticateVisitor, validateBooking, async (req, res, 
     const durationHours = (endDateTime - startDateTime) / (1000 * 60 * 60);
     const totalCost = durationHours * room.get('hourly_rate');
 
-    // Format times for MySQL storage via webhook
+    // Format times for MySQL storage
     const formatMySQLDateTime = (date) => new Date(date).toISOString().replace('T', ' ').substring(0, 19);
     const startTimeMySQL = formatMySQLDateTime(start_time);
     const endTimeMySQL = formatMySQLDateTime(end_time);
-    
-    // Create Stripe checkout session
-    const stripe = require('stripe')(require('../config/stripe').secretKey);
-    const stripeConfig = require('../config/stripe');
-    
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: stripeConfig.currency,
-            product_data: {
-              name: `Room Booking: ${room.get('room_name')}`,
-              description: `Booking Reference: ${bookingReference}`,
-            },
-            unit_amount: Math.round(totalCost * 100), // Convert to cents
-          },
-          quantity: 1,
-        },
-      ],
-      metadata: {
-        booking_reference: bookingReference,
-        visitor_id: String(req.user.id),
-        room_id: String(room_id),
-        booking_date: booking_date,
-        start_time: startTimeMySQL,
-        end_time: endTimeMySQL,
-        purpose: purpose || '',
-        description: description || '',
-        expected_attendees: String(attendees || 1),
-        total_cost: String(totalCost)
-      },
-      mode: 'payment',
-      success_url: stripeConfig.successUrl,
-      cancel_url: stripeConfig.cancelUrl,
-    });
+
+    // Create booking directly (no payment)
+    const booking = await Booking.forge({
+      room_id,
+      visitor_id: req.user.id,
+      booking_reference: bookingReference,
+      booking_date,
+      start_time: startTimeMySQL,
+      end_time: endTimeMySQL,
+      purpose,
+      description: description || null,
+      expected_attendees: parseInt(expected_attendees || '1', 10),
+      status: 'pending_approval',
+      total_cost: parseFloat(totalCost)
+    }).save();
 
     res.status(201).json({
       success: true,
-      message: 'Redirect to Stripe checkout to complete payment',
-      data: {
-        payment: {
-          sessionId: session.id,
-          url: session.url
-        }
-      }
+      message: 'Booking created and pending approval',
+      data: booking
     });
   } catch (error) {
     next(error);
   }
 });
+
+// Booking endpoints continue below
 
 // Get visitor's bookings
 router.get('/bookings', authenticateVisitor, async (req, res, next) => {
@@ -660,64 +636,5 @@ router.get('/bookings/history', authenticateVisitor, async (req, res, next) => {
 });
 
 
-
-// Stripe webhook to handle payment confirmation
-router.post('/stripe/webhook', async (req, res, next) => {
-  try {
-    const stripe = require('stripe')(require('../config/stripe').secretKey);
-    const endpointSecret = require('../config/stripe').webhookSecret;
-    
-    const sig = req.headers['stripe-signature'];
-    let event;
-
-    try {
-      event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
-    } catch (err) {
-      console.log(`Webhook signature verification failed.`, err.message);
-      return res.status(400).send(`Webhook Error: ${err.message}`);
-    }
-
-    // Handle the event
-    switch (event.type) {
-      case 'checkout.session.completed':
-        const session = event.data.object;
-        // Create booking only after successful payment
-        if (session.metadata && session.metadata.booking_reference) {
-          const md = session.metadata;
-          const booking = await Booking.forge({
-            room_id: parseInt(md.room_id, 10),
-            visitor_id: parseInt(md.visitor_id, 10),
-            booking_reference: md.booking_reference,
-            booking_date: md.booking_date,
-            start_time: md.start_time,
-            end_time: md.end_time,
-            purpose: md.purpose || null,
-            description: md.description || null,
-            expected_attendees: parseInt(md.expected_attendees || '1', 10),
-            status: 'pending_approval',
-            total_cost: parseFloat(md.total_cost),
-            stripe_session_id: session.id,
-            payment_date: new Date()
-          }).save();
-
-          console.log(`Booking ${booking.get('booking_reference')} created after payment`);
-        }
-        break;
-        
-      case 'checkout.session.expired':
-        const expiredSession = event.data.object;
-        
-        // No pre-booking exists; nothing to cancel in DB
-        break;
-        
-      default:
-        console.log(`Unhandled event type ${event.type}`);
-    }
-
-    res.json({ received: true });
-  } catch (error) {
-    next(error);
-  }
-});
 
 module.exports = router;

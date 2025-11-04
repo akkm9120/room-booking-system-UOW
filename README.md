@@ -1,10 +1,9 @@
 # Room Booking System - University of Wollongong
 
-A comprehensive room booking system with Stripe payment integration and admin approval workflow.
+A comprehensive room booking system with an admin approval workflow.
 
 ## 🚀 Features
 
-- **Payment-First Booking**: Secure Stripe integration with checkout sessions
 - **Admin Approval Workflow**: Multi-stage booking approval process
 - **JWT Authentication**: Secure authentication for visitors and admins
 - **Room Management**: Complete CRUD operations for rooms and availability
@@ -14,11 +13,10 @@ A comprehensive room booking system with Stripe payment integration and admin ap
 ## 📋 Booking Workflow
 
 ```
-1. User starts checkout (no DB booking yet)
-2. User completes Stripe payment → pending_approval  
-3. Admin approves/rejects → approved/rejected
-4. User can update only approved bookings
-5. User can cancel only paid/pending_approval bookings
+1. Visitor creates booking → pending_approval
+2. Admin approves/rejects → approved/rejected
+3. Visitor can update only approved bookings
+4. Visitor can cancel pending_approval bookings
 ```
 
 ## 🔧 Installation & Setup
@@ -109,34 +107,26 @@ Authorization: Bearer <your-jwt-token>
 - `GET /rooms/:id/availability` - Check room availability
 
 #### Booking Management
-- `POST /bookings` - Create new booking with Stripe payment (returns checkout URL)
+- `POST /bookings` - Create new booking (no payment)
 - `GET /bookings` - Get visitor bookings
 - `GET /bookings/:id` - Get single booking
 - `PUT /bookings/:id` - Update booking (approved bookings only)
-- `PATCH /bookings/:id/cancel` - Cancel booking (paid/pending_approval only)
+- `PATCH /bookings/:id/cancel` - Cancel booking (pending_approval only)
 - `GET /bookings/history` - Get booking history
-
-#### Payment Integration
-- `POST /stripe/webhook` - Stripe webhook for payment confirmations
-
-### 💳 Payment Routes (`/api/payment`)
-
-- `POST /create-checkout-session` - Create Stripe checkout session
-- `POST /webhook` - Stripe webhook handler
 
 ## 📊 Booking Status Flow
 
 | Status | Description | Actions Available |
 |--------|-------------|-------------------|
-| `pending_approval` | Payment completed, awaiting admin decision | Cancel, Admin Approve/Reject |
+| `pending_approval` | Awaiting admin decision | Cancel, Admin Approve/Reject |
 | `approved` | Admin approved the booking | Update, View |
 | `rejected` | Admin rejected the booking | View only |
-| `cancelled` | User cancelled or payment expired | View only |
+| `cancelled` | User cancelled | View only |
 
 ## 🔒 Business Rules
 
 ### Cancellation Policy
-- ✅ **Allowed**: `paid` or `pending_approval` bookings
+- ✅ **Allowed**: `pending_approval` bookings
 - ❌ **Not Allowed**: `approved`, `rejected`, or `cancelled` bookings
 
 ### Update Policy  
@@ -147,17 +137,6 @@ Authorization: Bearer <your-jwt-token>
 - ✅ **Can Approve/Reject**: `pending_approval` bookings only
 - ❌ **Cannot Act On**: Other statuses
 
-## 💰 Stripe Integration
-
-### Webhook Events
-- `checkout.session.completed` - Updates booking status to `pending_approval`
-- `checkout.session.expired` - Cancels unpaid booking
-
-### Payment Flow
-1. User creates booking → Receives Stripe checkout URL
-2. User completes payment on Stripe
-3. Webhook confirms payment → Status updates to `pending_approval`
-4. Admin can now approve/reject the booking
 
 ## 📝 Response Format
 
@@ -169,7 +148,6 @@ All API responses follow this structure:
   "message": "string",
   "data": "object|array (optional)",
   "pagination": "object (for paginated responses)",
-  "checkout_url": "string (for booking creation with Stripe)"
 }
 ```
 
@@ -185,7 +163,6 @@ The application is configured for Railway deployment with:
 - **Backend**: Node.js, Express.js
 - **Database**: PostgreSQL with Knex.js ORM
 - **Authentication**: JWT (JSON Web Tokens)
-- **Payment**: Stripe API
 - **Deployment**: Railway
 
 ## 📞 Support

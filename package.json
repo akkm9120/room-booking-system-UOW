@@ -39,8 +39,7 @@
     "jsonwebtoken": "^9.0.2",
     "knex": "^0.21.21",
     "morgan": "^1.10.0",
-    "mysql2": "^2.3.3",
-    "stripe": "^19.2.0"
+    "mysql2": "^2.3.3"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"

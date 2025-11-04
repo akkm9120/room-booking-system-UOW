@@ -4,7 +4,6 @@ const router = express.Router();
 // Import route modules
 const adminRoutes = require('./admin');
 const visitorRoutes = require('./visitor');
-const paymentRoutes = require('./payment');
 
 
 
@@ -49,47 +48,32 @@ router.get('/', (req, res) => {
           'GET /api/visitor/rooms - Get available rooms',
           'GET /api/visitor/rooms/:id - Get single room',
           'GET /api/visitor/rooms/:id/availability - Check room availability',
-          'POST /api/visitor/bookings - Create new booking with Stripe payment (returns checkout URL)',
+          'POST /api/visitor/bookings - Create new booking (no payment)',
           'GET /api/visitor/bookings - Get visitor bookings',
           'GET /api/visitor/bookings/:id - Get single booking',
           'PUT /api/visitor/bookings/:id - Update booking (approved bookings only)',
-          'PATCH /api/visitor/bookings/:id/cancel - Cancel booking (paid/pending_approval only)',
-          'GET /api/visitor/bookings/history - Get booking history',
-          'POST /api/visitor/stripe/webhook - Stripe webhook for payment confirmations'
-        ]
-      },
-      payment: {
-        base: '/api/payment',
-        description: 'Payment processing endpoints',
-        routes: [
-          'POST /api/payment/create-checkout-session - Create Stripe checkout session',
-          'POST /api/payment/webhook - Stripe webhook handler'
-        ]
-      }
+          'PATCH /api/visitor/bookings/:id/cancel - Cancel booking (pending_approval only)',
+          'GET /api/visitor/bookings/history - Get booking history'
+      ]
+    },
+      
     },
     booking_workflow: {
-      description: 'Booking is persisted only after successful payment, then admin approval',
+      description: 'Booking is created immediately and then requires admin approval',
       status_flow: 'pending_approval → approved/rejected',
       statuses: {
-        pending_approval: 'Payment completed, awaiting admin decision',
+        pending_approval: 'Awaiting admin decision',
         approved: 'Admin approved the booking',
         rejected: 'Admin rejected the booking',
-        cancelled: 'User cancelled or payment expired'
+        cancelled: 'User cancelled'
       },
       restrictions: {
-        cancellation: 'Only allowed for paid/pending_approval bookings',
+        cancellation: 'Only allowed for pending_approval bookings',
         updates: 'Only allowed for approved bookings',
         admin_actions: 'Can only approve/reject pending_approval bookings'
       }
     },
-    stripe_integration: {
-      description: 'Stripe payment processing with webhooks',
-      checkout_flow: 'POST /bookings returns Stripe checkout URL → User pays → Webhook confirms payment',
-      webhook_events: [
-        'checkout.session.completed - Updates status to pending_approval',
-        'checkout.session.expired - Cancels unpaid booking'
-      ]
-    },
+    
     documentation: {
       authentication: 'JWT Bearer token required for protected routes',
       content_type: 'application/json',
@@ -97,33 +81,14 @@ router.get('/', (req, res) => {
         success: 'boolean',
         message: 'string',
         data: 'object|array (optional)',
-        pagination: 'object (for paginated responses)',
-        checkout_url: 'string (for booking creation with Stripe)'
+        pagination: 'object (for paginated responses)'
       }
     }
-  });
-});
-
-// Stripe redirect routes
-router.get('/booking/success', (req, res) => {
-  const sessionId = req.query.session_id;
-  res.json({
-    success: true,
-    message: 'Payment successful',
-    sessionId: sessionId
-  });
-});
-
-router.get('/booking/cancel', (req, res) => {
-  res.json({
-    success: false,
-    message: 'Payment cancelled',
   });
 });
 
 // Mount route modules
 router.use('/admin', adminRoutes);
 router.use('/visitor', visitorRoutes);
-router.use('/payment', paymentRoutes);
 
 module.exports = router;
