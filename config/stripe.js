@@ -3,15 +3,15 @@
  */
 require('dotenv').config();
 
-// Resolve a safe base URL for Stripe redirects
-const resolvedBaseUrl = (
-  process.env.FRONTEND_URL ||
+// Resolve base URL for Stripe redirects, prioritizing FRONTEND_URL per requirement
+const frontendUrl = process.env.FRONTEND_URL;
+const fallbackUrl = (
+  process.env.RAILWAY_PUBLIC_URL ||
   process.env.APP_URL ||
   process.env.SERVER_URL ||
-  process.env.RAILWAY_PUBLIC_URL ||
-  // Fallbacks for local and current production deployment
-  'https://room-booking-system-uow-production.up.railway.app/api'
+  'http://localhost:3000'
 );
+const resolvedBaseUrl = frontendUrl || fallbackUrl;
 
 const stripeConfig = {
   secretKey: process.env.STRIPE_SECRET_KEY || 'sk_test_your_test_key',
