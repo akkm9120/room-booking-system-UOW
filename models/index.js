@@ -116,20 +116,22 @@ const Booking = bookshelf.model('Booking', {
 }, {
   async checkConflictingBookings(room_id, booking_date, start_time, end_time) {
     return await Booking
-      .where('room_id', room_id)
-      .where('booking_date', booking_date)
-      .where('status', 'confirmed')
-      .where(function() {
-        this.where(function() {
-          this.where('start_time', '<=', start_time)
-            .where('end_time', '>', start_time);
-        }).orWhere(function() {
-          this.where('start_time', '<', end_time)
-            .where('end_time', '>=', end_time);
-        }).orWhere(function() {
-          this.where('start_time', '>=', start_time)
-            .where('end_time', '<=', end_time);
-        });
+      .query(qb => {
+        qb.where('room_id', room_id)
+          .where('booking_date', booking_date)
+          .whereIn('status', ['pending_approval', 'approved', 'completed'])
+          .where(function() {
+            this.where(function() {
+              this.where('start_time', '<=', start_time)
+                .where('end_time', '>', start_time);
+            }).orWhere(function() {
+              this.where('start_time', '<', end_time)
+                .where('end_time', '>=', end_time);
+            }).orWhere(function() {
+              this.where('start_time', '>=', start_time)
+                .where('end_time', '<=', end_time);
+            });
+          });
       })
       .fetchAll();
   },

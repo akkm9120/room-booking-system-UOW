@@ -13,15 +13,16 @@ const { models } = require('../models');
  */
 router.post('/create-checkout-session', auth.authenticateVisitor, async (req, res) => {
   try {
-    const { booking_id } = req.body;
-    
-    if (!booking_id) {
+    const bodyId = req.body?.booking_id;
+    const queryId = req.query?.booking_id || req.query?.id;
+    const bookingId = bodyId || queryId;
+    if (!bookingId) {
       return res.status(400).json({ success: false, message: 'Booking ID is required' });
     }
     
     // Get booking details
     const booking = await models.Booking.query()
-      .findById(booking_id)
+      .findById(bookingId)
       .withGraphFetched('[room, visitor]');
     
     if (!booking) {
@@ -43,7 +44,8 @@ router.post('/create-checkout-session', auth.authenticateVisitor, async (req, re
             product_data: {
               name: `Room Booking: ${booking.room.room_name}`,
               description: `Booking Reference: ${booking.booking_reference}`,
-              images: [process.env.FRONTEND_URL + '/images/room.jpg'], // Optional: Add room image
+              // Optional image; only include if FRONTEND_URL is defined and looks valid
+              images: process.env.FRONTEND_URL ? [process.env.FRONTEND_URL + '/images/room.jpg'] : undefined,
             },
             unit_amount: Math.round(parseFloat(booking.total_cost) * 100), // Convert to cents
           },
@@ -90,20 +92,29 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
   switch (event.type) {
     case 'checkout.session.completed':
       const session = event.data.object;
-      
-      // Update booking status to confirmed after successful payment
-      if (session.metadata && session.metadata.booking_id) {
+      // Create booking only after successful payment
+      if (session.metadata && session.metadata.booking_reference) {
+        const md = session.metadata;
         try {
-          await models.Booking.query()
-            .findById(session.metadata.booking_id)
-            .patch({
-              status: 'confirmed',
-              updated_at: new Date()
-            });
-          
-          console.log(`Payment completed for booking ${session.metadata.booking_reference}`);
+          const booking = await models.Booking.query().insert({
+            room_id: parseInt(md.room_id, 10),
+            visitor_id: parseInt(md.visitor_id, 10),
+            booking_reference: md.booking_reference,
+            booking_date: md.booking_date,
+            start_time: md.start_time,
+            end_time: md.end_time,
+            purpose: md.purpose || null,
+            description: md.description || null,
+            expected_attendees: parseInt(md.expected_attendees || '1', 10),
+            status: 'pending_approval',
+            total_cost: parseFloat(md.total_cost),
+            stripe_session_id: session.id,
+            payment_date: new Date()
+          });
+
+          console.log(`Payment completed; booking created ${booking.booking_reference}`);
         } catch (error) {
-          console.error('Error updating booking after payment:', error);
+          console.error('Error creating booking after payment:', error);
         }
       }
       break;
@@ -148,7 +159,7 @@ router.get('/verify/:bookingId', auth.authenticateVisitor, async (req, res) => {
         booking_id: booking.id,
         booking_reference: booking.booking_reference,
         status: booking.status,
-        is_paid: booking.status === 'confirmed'
+        is_paid: ['pending_approval','approved','completed'].includes(booking.status) && !!booking.stripe_session_id
       }
     });
   } catch (error) {

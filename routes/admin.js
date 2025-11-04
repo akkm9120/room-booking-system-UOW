@@ -557,7 +557,6 @@ router.get('/dashboard/stats', authenticateAdmin, async (req, res, next) => {
     const totalRooms = await Room.count();
     const totalVisitors = await Visitor.count();
     const totalBookings = await Booking.count();
-    const pendingPaymentBookings = await Booking.where('status', 'pending_payment').count();
     const pendingApprovalBookings = await Booking.where('status', 'pending_approval').count();
     const approvedBookings = await Booking.where('status', 'approved').count();
     const rejectedBookings = await Booking.where('status', 'rejected').count();
@@ -570,7 +569,6 @@ router.get('/dashboard/stats', authenticateAdmin, async (req, res, next) => {
         totalRooms,
         totalVisitors,
         totalBookings,
-        pendingPaymentBookings,
         pendingApprovalBookings,
         approvedBookings,
         rejectedBookings,

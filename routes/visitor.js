@@ -193,19 +193,21 @@ router.get('/rooms', async (req, res, next) => {
     // If date and time are provided, filter out rooms that are already booked
     if (date && start_time && end_time) {
       const conflictingBookings = await Booking
-        .where('booking_date', date)
-        .where('status', 'confirmed')
-        .where(function() {
-          this.where(function() {
-            this.where('start_time', '<=', start_time)
-              .where('end_time', '>', start_time);
-          }).orWhere(function() {
-            this.where('start_time', '<', end_time)
-              .where('end_time', '>=', end_time);
-          }).orWhere(function() {
-            this.where('start_time', '>=', start_time)
-              .where('end_time', '<=', end_time);
-          });
+        .query(qb => {
+          qb.where('booking_date', date)
+            .whereIn('status', ['pending_approval', 'approved', 'completed'])
+            .where(function() {
+              this.where(function() {
+                this.where('start_time', '<=', start_time)
+                  .where('end_time', '>', start_time);
+              }).orWhere(function() {
+                this.where('start_time', '<', end_time)
+                  .where('end_time', '>=', end_time);
+              }).orWhere(function() {
+                this.where('start_time', '>=', start_time)
+                  .where('end_time', '<=', end_time);
+              });
+            });
         })
         .fetchAll();
 
@@ -340,7 +342,7 @@ router.post('/bookings', authenticateVisitor, validateBooking, async (req, res, 
       });
     }
 
-    // Generate booking reference
+    // Generate booking reference (used in Stripe metadata)
     const bookingReference = await Booking.generateBookingReference();
 
     // Calculate total cost
@@ -349,25 +351,10 @@ router.post('/bookings', authenticateVisitor, validateBooking, async (req, res, 
     const durationHours = (endDateTime - startDateTime) / (1000 * 60 * 60);
     const totalCost = durationHours * room.get('hourly_rate');
 
-    // Create booking with pending payment status
-    const booking = await Booking.forge({
-      room_id,
-      visitor_id: req.user.id,
-      booking_reference: bookingReference,
-      booking_date,
-      start_time,
-      end_time,
-      purpose,
-      description,
-      expected_attendees: attendees || 1,
-      status: 'pending_payment', // Payment required first
-      total_cost: totalCost
-    }).save();
-
-    // Fetch booking with related data
-    const newBooking = await Booking.where({ id: booking.id }).fetch({
-      withRelated: ['room', 'visitor']
-    });
+    // Format times for MySQL storage via webhook
+    const formatMySQLDateTime = (date) => new Date(date).toISOString().replace('T', ' ').substring(0, 19);
+    const startTimeMySQL = formatMySQLDateTime(start_time);
+    const endTimeMySQL = formatMySQLDateTime(end_time);
     
     // Create Stripe checkout session
     const stripe = require('stripe')(require('../config/stripe').secretKey);
@@ -389,8 +376,16 @@ router.post('/bookings', authenticateVisitor, validateBooking, async (req, res, 
         },
       ],
       metadata: {
-        booking_id: booking.id,
         booking_reference: bookingReference,
+        visitor_id: String(req.user.id),
+        room_id: String(room_id),
+        booking_date: booking_date,
+        start_time: startTimeMySQL,
+        end_time: endTimeMySQL,
+        purpose: purpose || '',
+        description: description || '',
+        expected_attendees: String(attendees || 1),
+        total_cost: String(totalCost)
       },
       mode: 'payment',
       success_url: stripeConfig.successUrl,
@@ -399,9 +394,8 @@ router.post('/bookings', authenticateVisitor, validateBooking, async (req, res, 
 
     res.status(201).json({
       success: true,
-      message: 'Booking created successfully, redirecting to payment',
+      message: 'Redirect to Stripe checkout to complete payment',
       data: {
-        booking: newBooking.toJSON(),
         payment: {
           sessionId: session.id,
           url: session.url
@@ -575,21 +569,23 @@ router.put('/bookings/:id', authenticateVisitor, validateId, validateBooking, as
 
       // Check for conflicting bookings (excluding current booking)
       const conflictingBookings = await Booking
-        .where('room_id', room_id)
-        .where('booking_date', booking_date)
-        .where('status', 'confirmed')
-        .where('id', '!=', req.params.id)
-        .where(function() {
-          this.where(function() {
-            this.where('start_time', '<=', start_time)
-              .where('end_time', '>', start_time);
-          }).orWhere(function() {
-            this.where('start_time', '<', end_time)
-              .where('end_time', '>=', end_time);
-          }).orWhere(function() {
-            this.where('start_time', '>=', start_time)
-              .where('end_time', '<=', end_time);
-          });
+        .query(qb => {
+          qb.where('room_id', room_id)
+            .where('booking_date', booking_date)
+            .whereIn('status', ['pending_approval', 'approved', 'completed'])
+            .where('id', '!=', req.params.id)
+            .where(function() {
+              this.where(function() {
+                this.where('start_time', '<=', start_time)
+                  .where('end_time', '>', start_time);
+              }).orWhere(function() {
+                this.where('start_time', '<', end_time)
+                  .where('end_time', '>=', end_time);
+              }).orWhere(function() {
+                this.where('start_time', '>=', start_time)
+                  .where('end_time', '<=', end_time);
+              });
+            });
         })
         .fetchAll();
 
@@ -685,40 +681,33 @@ router.post('/stripe/webhook', async (req, res, next) => {
     switch (event.type) {
       case 'checkout.session.completed':
         const session = event.data.object;
-        
-        // Update booking status to paid and pending approval
-        if (session.metadata && session.metadata.booking_id) {
-          const booking = await Booking.where({ id: session.metadata.booking_id }).fetch();
-          
-          if (booking && booking.get('status') === 'pending_payment') {
-            await booking.save({
-              status: 'pending_approval',
-              payment_status: 'paid',
-              stripe_session_id: session.id,
-              payment_date: new Date()
-            });
-            
-            console.log(`Booking ${booking.get('booking_reference')} payment confirmed`);
-          }
+        // Create booking only after successful payment
+        if (session.metadata && session.metadata.booking_reference) {
+          const md = session.metadata;
+          const booking = await Booking.forge({
+            room_id: parseInt(md.room_id, 10),
+            visitor_id: parseInt(md.visitor_id, 10),
+            booking_reference: md.booking_reference,
+            booking_date: md.booking_date,
+            start_time: md.start_time,
+            end_time: md.end_time,
+            purpose: md.purpose || null,
+            description: md.description || null,
+            expected_attendees: parseInt(md.expected_attendees || '1', 10),
+            status: 'pending_approval',
+            total_cost: parseFloat(md.total_cost),
+            stripe_session_id: session.id,
+            payment_date: new Date()
+          }).save();
+
+          console.log(`Booking ${booking.get('booking_reference')} created after payment`);
         }
         break;
         
       case 'checkout.session.expired':
         const expiredSession = event.data.object;
         
-        // Cancel booking if payment session expired
-        if (expiredSession.metadata && expiredSession.metadata.booking_id) {
-          const booking = await Booking.where({ id: expiredSession.metadata.booking_id }).fetch();
-          
-          if (booking && booking.get('status') === 'pending_payment') {
-            await booking.save({
-              status: 'cancelled',
-              cancellation_reason: 'Payment session expired'
-            });
-            
-            console.log(`Booking ${booking.get('booking_reference')} cancelled due to payment expiry`);
-          }
-        }
+        // No pre-booking exists; nothing to cancel in DB
         break;
         
       default:

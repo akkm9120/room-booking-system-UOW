@@ -68,10 +68,9 @@ router.get('/', (req, res) => {
       }
     },
     booking_workflow: {
-      description: 'Payment-first booking workflow with admin approval',
-      status_flow: 'pending_payment → pending_approval → approved/rejected',
+      description: 'Booking is persisted only after successful payment, then admin approval',
+      status_flow: 'pending_approval → approved/rejected',
       statuses: {
-        pending_payment: 'Booking created, awaiting payment',
         pending_approval: 'Payment completed, awaiting admin decision',
         approved: 'Admin approved the booking',
         rejected: 'Admin rejected the booking',

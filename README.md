@@ -14,7 +14,7 @@ A comprehensive room booking system with Stripe payment integration and admin ap
 ## 📋 Booking Workflow
 
 ```
-1. User creates booking → pending_payment
+1. User starts checkout (no DB booking yet)
 2. User completes Stripe payment → pending_approval  
 3. Admin approves/rejects → approved/rejected
 4. User can update only approved bookings
@@ -128,7 +128,6 @@ Authorization: Bearer <your-jwt-token>
 
 | Status | Description | Actions Available |
 |--------|-------------|-------------------|
-| `pending_payment` | Booking created, awaiting payment | Cancel |
 | `pending_approval` | Payment completed, awaiting admin decision | Cancel, Admin Approve/Reject |
 | `approved` | Admin approved the booking | Update, View |
 | `rejected` | Admin rejected the booking | View only |
