@@ -29,14 +29,31 @@ app.use(helmet({
   },
 }));
 
-// CORS configuration (allow all origins and preflight)
-app.use(cors({
-  origin: true,
+// CORS configuration using environment-driven allowed origins
+const allowedOriginsEnv = process.env.ALLOWED_ORIGINS || '*';
+const allowedOrigins = allowedOriginsEnv
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow non-browser requests (no origin) and wildcard
+    if (!origin || allowedOrigins.includes('*')) {
+      return callback(null, true);
+    }
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-}));
-// Handle preflight requests globally
-app.options('*', cors());
+};
+
+app.use(cors(corsOptions));
+// Handle preflight requests globally with the same options
+app.options('*', cors(corsOptions));
 
 // Rate limiting disabled
 // Global and auth-specific rate limiters have been removed to allow unrestricted access.
