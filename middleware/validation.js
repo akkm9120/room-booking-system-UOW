@@ -33,9 +33,9 @@ const validateAdminRegistration = [
     .isLength({ min: 1, max: 50 })
     .withMessage('Last name is required and must be less than 50 characters'),
   body('phone')
-    .optional()
-    .isMobilePhone()
-    .withMessage('Please provide a valid phone number'),
+    .optional({ checkFalsy: true })
+    .isLength({ min: 5, max: 20 })
+    .withMessage('Phone number must be between 5 and 20 characters'),
   body('role')
     .optional()
     .isIn(['admin', 'super_admin'])
@@ -72,9 +72,9 @@ const validateVisitorRegistration = [
     .isLength({ max: 20 })
     .withMessage('Student ID must be less than 20 characters'),
   body('phone')
-    .optional()
-    .isMobilePhone()
-    .withMessage('Please provide a valid phone number'),
+    .optional({ checkFalsy: true })
+    .isLength({ min: 5, max: 20 })
+    .withMessage('Phone number must be between 5 and 20 characters'),
   body('user_type')
     .optional()
     .isIn(['student', 'staff', 'visitor'])

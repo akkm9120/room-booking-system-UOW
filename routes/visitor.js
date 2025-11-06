@@ -104,11 +104,13 @@ router.post('/login', validateVisitorLogin, async (req, res, next) => {
     // Generate token
     const token = generateToken(visitor.toJSON(), 'visitor');
 
-    res.json({
+  res.json({
       success: true,
       message: 'Login successful',
       data: {
         visitor: visitor.toJSON(),
+        user: visitor.toJSON(),
+        user_type: 'visitor',
         token
       }
     });

@@ -56,6 +56,8 @@ router.post('/login', validateAdminLogin, async (req, res, next) => {
       message: 'Login successful',
       data: {
         admin: adminData,
+        user: adminData,
+        user_type: 'admin',
         token
       }
     });
