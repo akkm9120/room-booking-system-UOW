@@ -112,6 +112,123 @@ router.get('/profile', authenticateAdmin, async (req, res, next) => {
   }
 });
 
+// Admin Management Routes (Super Admin Only)
+// Get all admins
+router.get('/admins', authenticateAdmin, requireSuperAdmin, async (req, res, next) => {
+  try {
+    const { page = 1, limit = 100, search, role, is_active } = req.query;
+    
+    let query = Admin.forge();
+    
+    if (search) {
+      query = query.where(function() {
+        this.where('username', 'LIKE', `%${search}%`)
+          .orWhere('email', 'LIKE', `%${search}%`)
+          .orWhere('first_name', 'LIKE', `%${search}%`)
+          .orWhere('last_name', 'LIKE', `%${search}%`);
+      });
+    }
+    
+    if (role) {
+      query = query.where('role', role);
+    }
+    
+    if (is_active !== undefined) {
+      query = query.where('is_active', is_active === 'true');
+    }
+
+    const admins = await query.fetchPage({
+      page: parseInt(page),
+      pageSize: parseInt(limit)
+    });
+
+    res.json({
+      success: true,
+      data: admins.toJSON(),
+      pagination: admins.pagination
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Get single admin
+router.get('/admins/:id', authenticateAdmin, requireSuperAdmin, validateId, async (req, res, next) => {
+  try {
+    const admin = await Admin.where({ id: req.params.id }).fetch();
+
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message: 'Admin not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: admin.toJSON()
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Deactivate admin
+router.patch('/admins/:id/deactivate', authenticateAdmin, requireSuperAdmin, validateId, async (req, res, next) => {
+  try {
+    const admin = await Admin.where({ id: req.params.id }).fetch();
+    
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message: 'Admin not found'
+      });
+    }
+
+    // Prevent deactivating yourself
+    if (admin.id === req.admin.id) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot deactivate your own account'
+      });
+    }
+
+    await admin.save({ is_active: false });
+
+    res.json({
+      success: true,
+      message: 'Admin deactivated successfully',
+      data: admin.toJSON()
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Activate admin
+router.patch('/admins/:id/activate', authenticateAdmin, requireSuperAdmin, validateId, async (req, res, next) => {
+  try {
+    const admin = await Admin.where({ id: req.params.id }).fetch();
+    
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message: 'Admin not found'
+      });
+    }
+
+    await admin.save({ is_active: true });
+
+    res.json({
+      success: true,
+      message: 'Admin activated successfully',
+      data: admin.toJSON()
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Room Management Routes
 // Get all rooms
 router.get('/rooms', authenticateAdmin, async (req, res, next) => {
