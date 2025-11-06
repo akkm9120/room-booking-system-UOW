@@ -55,10 +55,10 @@ const Admin = bookshelf.model('Admin', {
 }, {
   // Static methods
   async findByEmail(email) {
-    return this.where({ email }).fetch();
+    return this.where({ email }).fetch({ require: false });
   },
   async findByUsername(username) {
-    return this.where({ username }).fetch();
+    return this.where({ username }).fetch({ require: false });
   },
   async hashPassword(password) {
     return bcrypt.hash(password, 10);
@@ -79,10 +79,10 @@ const Visitor = bookshelf.model('Visitor', {
   }
 }, {
   async findByEmail(email) {
-    return this.where({ email }).fetch();
+    return this.where({ email }).fetch({ require: false });
   },
   async findByStudentId(student_id) {
-    return this.where({ student_id }).fetch();
+    return this.where({ student_id }).fetch({ require: false });
   },
   async hashPassword(password) {
     return bcrypt.hash(password, 10);
