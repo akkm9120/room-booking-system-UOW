@@ -43,11 +43,19 @@ router.post('/login', validateAdminLogin, async (req, res, next) => {
     // Generate token
     const token = generateToken(admin.toJSON(), 'admin');
 
+    // Prepare admin data with clear role information
+    const adminData = admin.toJSON();
+    console.log('Admin login successful:', {
+      email: adminData.email,
+      role: adminData.role,
+      is_super_admin: adminData.role === 'super_admin'
+    });
+
     res.json({
       success: true,
       message: 'Login successful',
       data: {
-        admin: admin.toJSON(),
+        admin: adminData,
         token
       }
     });
@@ -103,9 +111,38 @@ router.post('/register', authenticateAdmin, requireSuperAdmin, validateAdminRegi
 // Get admin profile
 router.get('/profile', authenticateAdmin, async (req, res, next) => {
   try {
+    const adminData = req.admin.toJSON();
+    console.log('Admin profile requested:', {
+      email: adminData.email,
+      role: adminData.role,
+      is_super_admin: adminData.role === 'super_admin'
+    });
+    
     res.json({
       success: true,
-      data: req.admin.toJSON()
+      data: adminData
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Check if current admin is super admin
+router.get('/check-super-admin', authenticateAdmin, async (req, res, next) => {
+  try {
+    const isSuperAdmin = req.admin.get('role') === 'super_admin';
+    console.log('Super admin check:', {
+      email: req.admin.get('email'),
+      role: req.admin.get('role'),
+      is_super_admin: isSuperAdmin
+    });
+    
+    res.json({
+      success: true,
+      data: {
+        is_super_admin: isSuperAdmin,
+        role: req.admin.get('role')
+      }
     });
   } catch (error) {
     next(error);

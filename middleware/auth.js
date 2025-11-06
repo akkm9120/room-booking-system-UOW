@@ -3,12 +3,19 @@ const { Admin, Visitor } = require('../models');
 
 // Generate JWT token
 const generateToken = (user, userType) => {
+  const tokenPayload = { 
+    id: user.id, 
+    email: user.email, 
+    userType: userType
+  };
+  
+  // For admin users, include their role (super_admin or admin)
+  if (userType === 'admin' && user.role) {
+    tokenPayload.role = user.role;
+  }
+  
   return jwt.sign(
-    { 
-      id: user.id, 
-      email: user.email, 
-      userType: userType 
-    },
+    tokenPayload,
     process.env.JWT_SECRET,
     { expiresIn: '24h' }
   );
